@@ -12,9 +12,11 @@ jobs:
     steps:
       - name: Sanity check required files
         run: |
-          test -f secrets.rsc
-          test -f examples/secrets.yaml
-          test -f tests/integration/example_main.rsc
+          set -euxo pipefail
+          for f in secrets.rsc examples/secrets.yaml tests/integration/example_main.rsc; do
+            echo "check:$f"
+            test -f "$f" || { echo "::error file=$f::missing"; exit 1; }
+          done
 
       - name: Install deps
         run: |

@@ -10,6 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Optional: quick visibility if something's off
+      # - name: Debug workspace
+      #   run: |
+      #     find . -maxdepth 3 -type f -print | sort
+
       - name: Sanity check required files
         run: |
           set -euxo pipefail
@@ -55,16 +65,16 @@ jobs:
             -re "Login:" {}
             -re "MikroTik RouterOS" { exp_continue }
           }
-          send "admin\n"
+          send -- "admin\r"
           expect {
-            -re "Password:" { send "\n" }
+            -re "Password:" { send -- "\r" }
             -re "logged in" {}
           }
           # Basic net + SSH
-          send "/ip address add address=10.0.2.15/24 interface=ether1 comment=ci\n"
-          send "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2\n"
-          send "/ip service set ssh disabled=no port=22\n"
-          send "quit\n"
+          send -- "/ip address add address=10.0.2.15/24 interface=ether1 comment=ci\r"
+          send -- "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2\r"
+          send -- "/ip service set ssh disabled=no port=22\r"
+          send -- "quit\r"
           expect eof
           EOF
           chmod +x serial-setup.exp
@@ -82,7 +92,9 @@ jobs:
 
       - name: Push test files
         run: |
-          scp -P 2222 -o StrictHostKeyChecking=no secrets.rsc examples/secrets.yaml tests/integration/example_main.rsc admin@127.0.0.1:
+          scp -P 2222 -o StrictHostKeyChecking=no \
+            secrets.rsc examples/secrets.yaml tests/integration/example_main.rsc \
+            admin@127.0.0.1:
 
       - name: Run injector smoke test
         run: |
@@ -92,6 +104,6 @@ jobs:
       - name: Teardown QEMU
         if: always()
         run: |
-          if [[ -f qemu.pid ]]; then kill -TERM $(cat qemu.pid) || true; fi
+          if [[ -f qemu.pid ]]; then kill -TERM "$(cat qemu.pid)" || true; fi
           sleep 3
           ps aux | grep qemu || true

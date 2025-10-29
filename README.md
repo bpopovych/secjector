@@ -78,8 +78,8 @@ make docs
 flowchart LR
   A[main.rsc] -->|parse| B[secrets.rsc]
   B -->|returns code| A
-  A -->|defines $secret & helpers| A
-  A -->|calls| C[$secret "wifi_password"]
+  A -->|"defines $secret & helpers"| A
+  A -->|calls| C["$secret \"wifi_password\""]
   C --> D[(local map M)]
   D -.not exposed.-> A
 ```

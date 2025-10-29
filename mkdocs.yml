@@ -1,5 +1,5 @@
 site_name: Secjector
-repo_url: https://github.com/REPLACE_ORG/secjector
+repo_url: https://github.com/bpopovych/secjector
 theme:
   name: material
 nav:

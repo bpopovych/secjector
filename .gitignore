@@ -1,14 +1,16 @@
-# docs build
-site/
-dist/
-*.log
+ # docs build
+ site/
+ dist/
+ *.log
 
-# editor
-.DS_Store
-*.swp
+ # editor
+ .DS_Store
+ *.swp
 
-# MikroTik artifacts
+# MikroTik artifacts: ignore .rsc by default, but keep examples/tests for CI
 *.rsc
 !secrets.rsc
-examples/*.rsc
-tests/integration/*.rsc
+!examples/**/*.rsc
+!tests/**/*.rsc
+# optional: keep a root example if present
+!example_main.rsc

@@ -40,16 +40,22 @@ jobs:
             -re "Login:" {}
             -re "MikroTik RouterOS" { exp_continue }
           }
-          send "admin"
+          send "admin
+"
           expect {
-            -re "Password:" { send "" }
+            -re "Password:" { send "
+" }
             -re "logged in" {}
           }
           # Basic net + SSH
-          send "/ip address add address=10.0.2.15/24 interface=ether1 comment=ci"
-          send "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2"
-          send "/ip service set ssh disabled=no port=22"
-          send "quit"
+          send "/ip address add address=10.0.2.15/24 interface=ether1 comment=ci
+"
+          send "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2
+"
+          send "/ip service set ssh disabled=no port=22
+"
+          send "quit
+"
           expect eof
           EOF
           chmod +x serial-setup.exp

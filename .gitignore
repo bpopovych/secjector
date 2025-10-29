@@ -1,0 +1,14 @@
+# docs build
+site/
+dist/
+*.log
+
+# editor
+.DS_Store
+*.swp
+
+# MikroTik artifacts
+*.rsc
+!secrets.rsc
+examples/*.rsc
+tests/integration/*.rsc

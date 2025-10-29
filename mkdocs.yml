@@ -1,0 +1,14 @@
+site_name: Secjector
+repo_url: https://github.com/REPLACE_ORG/secjector
+theme:
+  name: material
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - Security: security.md
+  - FAQ: faq.md
+  - Roadmap: roadmap.md
+  - CI: ci.md
+markdown_extensions:
+  - admonition
+  - tables

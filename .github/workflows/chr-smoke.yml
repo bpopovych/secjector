@@ -3,7 +3,7 @@ name: CHR smoke (QEMU no-KVM)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 3 * * *"   # nightly smoke
+    - cron: "0 3 * * *" # nightly smoke
 
 jobs:
   chr-smoke:
@@ -26,7 +26,16 @@ jobs:
 
       - name: Boot CHR (background)
         run: |
-          nohup qemu-system-x86_64             -name "chr-ci"             -m 256 -smp 1             -drive file=chr.qcow2,if=virtio,format=qcow2             -nographic -monitor none             -serial telnet:127.0.0.1:5555,server,nowait             -netdev user,id=n1,hostfwd=tcp::2222-:22             -device virtio-net-pci,netdev=n1             -cpu max -machine accel=tcg             > qemu.log 2>&1 & echo $! > qemu.pid
+          nohup qemu-system-x86_64 \
+            -name "chr-ci" \
+            -m 256 -smp 1 \
+            -drive file=chr.qcow2,if=virtio,format=qcow2 \
+            -nographic -monitor none \
+            -serial telnet:127.0.0.1:5555,server,nowait \
+            -netdev user,id=n1,hostfwd=tcp::2222-:22 \
+            -device virtio-net-pci,netdev=n1 \
+            -cpu max -machine accel=tcg \
+            > qemu.log 2>&1 & echo $! > qemu.pid
           sleep 15
           echo "QEMU PID=$(cat qemu.pid)"
 
@@ -40,22 +49,16 @@ jobs:
             -re "Login:" {}
             -re "MikroTik RouterOS" { exp_continue }
           }
-          send "admin
-"
+          send "admin\n"
           expect {
-            -re "Password:" { send "
-" }
+            -re "Password:" { send "\n" }
             -re "logged in" {}
           }
           # Basic net + SSH
-          send "/ip address add address=10.0.2.15/24 interface=ether1 comment=ci
-"
-          send "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2
-"
-          send "/ip service set ssh disabled=no port=22
-"
-          send "quit
-"
+          send "/ip address add address=10.0.2.15/24 interface=ether1 comment=ci\n"
+          send "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2\n"
+          send "/ip service set ssh disabled=no port=22\n"
+          send "quit\n"
           expect eof
           EOF
           chmod +x serial-setup.exp

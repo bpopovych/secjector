@@ -16,6 +16,7 @@ test:
 	@bash -c 'grep -q "secrets.rsc" README.md && echo "README sanity: ok"'
 	@bash -c 'test -f examples/secrets.yaml && echo "examples exist: ok"'
 	@tests/unit/test_regressions.py
+	@tests/unit/test_parser.py
 
 test-integration:
 	@test -n "$$ROUTER_HOST" && test -n "$$ROUTER_USER" && test -n "$$ROUTER_IDENT" || \

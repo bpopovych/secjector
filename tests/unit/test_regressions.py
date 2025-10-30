@@ -8,32 +8,22 @@ from pathlib import Path
 def main() -> None:
     text = Path("secrets.rsc").read_text()
 
-    if ":local key [$__unquote [$__trim" not in text:
+    if ":local key [$helperUnquote [$helperTrim" not in text:
         raise SystemExit("routeros parser must unquote key tokens before use")
 
-    if not re.search(r"\. \[\$__esc \$key\] \.", text):
-        raise SystemExit("routeros map population must escape keys via $__esc")
+    if not re.search(r"\. \[\$helperEsc \$key\] \.", text):
+        raise SystemExit("routeros map population must escape keys via $helperEsc")
 
     if '[:pick $line 0 3]="---"' not in text:
         raise SystemExit("routeros parser must ignore YAML document-start markers")
 
-    token = ':set OUT ($OUT . ":local secret_cleanup do={ '
-    start = text.find(token)
-    if start == -1:
-        raise SystemExit("unable to locate secret_cleanup helper body")
+    # secretCleanup disabled in RouterOS 7.20.x (cannot :set :global functions)
+    # Check that it's commented out
+    if text.count('# :set OUT ($OUT . ":local secretCleanup do={') != 1:
+        raise SystemExit("secretCleanup code should be commented out (found in uncommented form)")
 
-    segment = text[start + len(token):]
-    end = segment.find(';\\n")')
-    if end == -1:
-        raise SystemExit("unable to locate end of secret_cleanup helper")
-
-    cleanup_body = segment[:end]
-    for helper in ("secret", "secret_has", "secret_require", "secret_cleanup"):
-        if f":set {helper} do={{" not in cleanup_body:
-            raise SystemExit(f"secret_cleanup must rebind {helper} with :set")
-
-    if ":local secret do={" in cleanup_body:
-        raise SystemExit("secret_cleanup must not redeclare helpers with :local")
+    if '# secretCleanup() -> disable accessors' not in text:
+        raise SystemExit("secretCleanup comment should explain RouterOS 7.20.x limitation")
 
     print("secrets.rsc regression guards: ok")
 

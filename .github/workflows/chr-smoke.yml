@@ -47,7 +47,7 @@ jobs:
 
       - name: Fetch CHR image
         run: |
-          VER="7.17.2"   # update as needed
+          VER="7.20.2"   # tested and working on bare metal
           url="https://download.mikrotik.com/routeros/${VER}/chr-${VER}.img.zip"
           curl -fsSLO "$url"
           unzip -q "chr-${VER}.img.zip"
@@ -118,8 +118,9 @@ jobs:
       - name: Run injector smoke test
         run: |
           ssh_opts=(-p 2222 -o StrictHostKeyChecking=no)
+          # Use :parse instead of /import for RouterOS 7.20.x compatibility
           ssh "${ssh_opts[@]}" admin@127.0.0.1 \
-            '/import file-name=example_main.rsc' \
+            ':parse [/file get "example_main.rsc" contents]' \
             | tee ci-run.log
           grep -q 'TEST_OK:' ci-run.log
 

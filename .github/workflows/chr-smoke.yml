@@ -26,7 +26,7 @@ jobs:
           set -euxo pipefail
           files=(
             secrets.rsc
-            examples/secrets.yaml
+            tests/secrets.yaml
             tests/integration/example_main.rsc
           )
           for f in "${files[@]}"; do
@@ -111,7 +111,7 @@ jobs:
           scp_opts=(-P 2222 -o StrictHostKeyChecking=no)
           scp "${scp_opts[@]}" \
             secrets.rsc \
-            examples/secrets.yaml \
+            tests/secrets.yaml \
             tests/integration/example_main.rsc \
             admin@127.0.0.1:
 

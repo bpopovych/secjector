@@ -14,6 +14,9 @@ def main() -> None:
     if not re.search(r"\. \[\$__esc \$key\] \.", text):
         raise SystemExit("routeros map population must escape keys via $__esc")
 
+    if '[:pick $line 0 3]="---"' not in text:
+        raise SystemExit("routeros parser must ignore YAML document-start markers")
+
     token = ':set OUT ($OUT . ":local secret_cleanup do={ '
     start = text.find(token)
     if start == -1:

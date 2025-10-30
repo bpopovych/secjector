@@ -74,6 +74,12 @@
     :if (([:len $line]>0) && ([:pick $line ([:len $line]-1) [:len $line]]="\r")) do={ :set line [:pick $line 0 ([:len $line]-1)] }
     :set line [$__trim $line]
     :if (($line="") || ([:pick $line 0 1]="#")) do={ :continue }
+    :if (([:len $line] >= 3) && ([:pick $line 0 3]="---")) do={
+        :if (([:len $line]=3) || ([:pick $line 3 4]~" |\t#")) do={ :continue }
+    }
+    :if (([:len $line] >= 3) && ([:pick $line 0 3]="...")) do={
+        :if (([:len $line]=3) || ([:pick $line 3 4]~" |\t#")) do={ :continue }
+    }
 
     :local pos [:find $line ":" 0]
     :if ($pos=nil) do={ :error ("secrets_injector: malformed line: " . $line) }

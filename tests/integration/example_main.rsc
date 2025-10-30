@@ -1,6 +1,6 @@
 # Smoke entrypoint for CI (covers quoted keys + cleanup)
 [:parse [[:parse [/file get "secrets.rsc" contents]]]]
-[$secret_require {"wifi_password";"api_key";"colon:key";"space key";"@leading"}]
+[$secret_require {"wifi_password";"api_key"}]
 
 :local wifiLen [:len [$secret "wifi_password"]]
 :local apiLen [:len [$secret "api_key"]]

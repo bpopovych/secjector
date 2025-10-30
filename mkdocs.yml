@@ -1,5 +1,7 @@
+---
 site_name: Secjector
-site_description: Tiny, local-only secrets accessor for MikroTik RouterOS scripts.
+site_description: >-
+  Tiny, local-only secrets accessor for MikroTik RouterOS scripts.
 repo_url: https://github.com/bpopovych/secjector
 repo_name: bpopovych/secjector
 theme:

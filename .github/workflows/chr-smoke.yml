@@ -1,6 +1,7 @@
+---
 name: CHR smoke (QEMU no-KVM)
 
-on:
+'on':
   workflow_dispatch:
   # schedule:
   #   - cron: "0 3 * * *" # nightly smoke
@@ -23,7 +24,12 @@ jobs:
       - name: Sanity check required files
         run: |
           set -euxo pipefail
-          for f in secrets.rsc examples/secrets.yaml tests/integration/example_main.rsc; do
+          files=(
+            secrets.rsc
+            examples/secrets.yaml
+            tests/integration/example_main.rsc
+          )
+          for f in "${files[@]}"; do
             echo "check:$f"
             test -f "$f" || { echo "::error file=$f::missing"; exit 1; }
           done
@@ -31,12 +37,19 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils unzip expect openssh-client curl
+          sudo apt-get install -y \
+            qemu-system-x86 \
+            qemu-utils \
+            unzip \
+            expect \
+            openssh-client \
+            curl
 
       - name: Fetch CHR image
         run: |
           VER="7.17.2"   # update as needed
-          curl -fsSLO "https://download.mikrotik.com/routeros/${VER}/chr-${VER}.img.zip"
+          url="https://download.mikrotik.com/routeros/${VER}/chr-${VER}.img.zip"
+          curl -fsSLO "$url"
           unzip -q "chr-${VER}.img.zip"
           qemu-img convert -f raw -O qcow2 "chr-${VER}.img" chr.qcow2
 
@@ -71,7 +84,8 @@ jobs:
             -re "logged in" {}
           }
           # Basic net + SSH
-          send -- "/ip address add address=10.0.2.15/24 interface=ether1 comment=ci\r"
+          send -- "/ip address add address=10.0.2.15/24 interface=ether1 "
+          send -- "comment=ci\r"
           send -- "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2\r"
           send -- "/ip service set ssh disabled=no port=22\r"
           send -- "quit\r"
@@ -82,8 +96,10 @@ jobs:
 
       - name: Wait for SSH
         run: |
+          ssh_base="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 -p 2222"
           for i in {1..30}; do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 -p 2222 admin@127.0.0.1 ":put [/system resource get version]" 2>/dev/null; then
+            if $ssh_base admin@127.0.0.1 \
+              ":put [/system resource get version]" 2>/dev/null; then
               echo "SSH up"; exit 0
             fi
             sleep 2
@@ -92,13 +108,19 @@ jobs:
 
       - name: Push test files
         run: |
-          scp -P 2222 -o StrictHostKeyChecking=no \
-            secrets.rsc examples/secrets.yaml tests/integration/example_main.rsc \
+          scp_opts=(-P 2222 -o StrictHostKeyChecking=no)
+          scp "${scp_opts[@]}" \
+            secrets.rsc \
+            examples/secrets.yaml \
+            tests/integration/example_main.rsc \
             admin@127.0.0.1:
 
       - name: Run injector smoke test
         run: |
-          ssh -p 2222 -o StrictHostKeyChecking=no admin@127.0.0.1 '/import file-name=example_main.rsc' | tee ci-run.log
+          ssh_opts=(-p 2222 -o StrictHostKeyChecking=no)
+          ssh "${ssh_opts[@]}" admin@127.0.0.1 \
+            '/import file-name=example_main.rsc' \
+            | tee ci-run.log
           grep -q 'TEST_OK:' ci-run.log
 
       - name: Teardown QEMU

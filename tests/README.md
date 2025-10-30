@@ -1,6 +1,6 @@
 # Tests
 
-- `test` target: lightweight repo checks.
+- `test` target: lightweight repo checks + static regression guard for `secrets.rsc`.
 - `test-integration`: uploads to a live RouterOS and verifies behavior.
 
 Set env:

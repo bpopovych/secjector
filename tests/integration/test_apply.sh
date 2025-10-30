@@ -14,10 +14,13 @@ scp -i "${ROUTER_IDENT}" -o StrictHostKeyChecking=accept-new   secrets.rsc tests
 
 ssh -i "${ROUTER_IDENT}" -o StrictHostKeyChecking=accept-new   "${ROUTER_USER}@${ROUTER_HOST}"   '/import file-name=example_main.rsc' | tee /tmp/secjector-test.log
 
-if grep -q 'TEST_OK:' /tmp/secjector-test.log; then
+expected="TEST_OK:12:19:5:6:7:T:F:OK:F"
+if grep -q "${expected}" /tmp/secjector-test.log; then
   echo "Integration test passed"
   exit 0
 else
   echo "Integration test failed"
+  echo "Expected marker: ${expected}"
+  cat /tmp/secjector-test.log
   exit 1
 fi

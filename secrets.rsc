@@ -7,7 +7,7 @@
 #     $secret "key"            -> returns value or errors (default) / warns (optional)
 #     $secret_has "key"        -> boolean
 #     $secret_require {..}     -> validates required keys, error or warn per mode
-#     $secret_cleanup          -> disables accessors for the rest of the script
+#     $secret_cleanup          -> disables accessors for the rest of the script (second call errors)
 # - NOTE: No /system/script/environment usage, and no map is exposed in caller scope.
 #         Secrets exist only inside the helpers when called.
 #
@@ -78,7 +78,7 @@
     :local pos [:find $line ":" 0]
     :if ($pos=nil) do={ :error ("secrets_injector: malformed line: " . $line) }
 
-    :local key [$__trim [:pick $line 0 $pos]]
+    :local key [$__unquote [$__trim [:pick $line 0 $pos]]]
     :local tail [$__trim [:pick $line ($pos+1) [:len $line]]]
 
     # block scalar: key: |
@@ -103,14 +103,14 @@
             :if ($nl2 != $N) do={ :set raw ($raw . [:pick $txt $nl2 ($nl2+1)]) }
             :set p ($nl2+1)
         }
-        :set POP ($POP . ":set (\$M->\"" . $key . "\") \"" . [$__esc $raw] . "\";\n")
+        :set POP ($POP . ":set (\$M->\"" . [$__esc $key] . "\") \"" . [$__esc $raw] . "\";\n")
         :set indent -1
         :continue
     }
 
     # simple scalar: key: value
     :local val [$__unquote $tail]
-    :set POP ($POP . ":set (\$M->\"" . $key . "\") \"" . [$__esc $val] . "\";\n")
+    :set POP ($POP . ":set (\$M->\"" . [$__esc $key] . "\") \"" . [$__esc $val] . "\";\n")
 }
 
 # inline behavior mode
@@ -150,9 +150,10 @@
 
 # secret_cleanup() -> disable accessors for the rest of this script run
 :set OUT ($OUT . ":local secret_cleanup do={ \
-    :local secret do={ :error \"secrets cleaned\" }; \
-    :local secret_has do={ :return false }; \
-    :local secret_require do={ :error \"secrets cleaned\" }; \
+    :set secret do={ :error \"secrets cleaned\" }; \
+    :set secret_has do={ :return false }; \
+    :set secret_require do={ :error \"secrets cleaned\" }; \
+    :set secret_cleanup do={ :error \"secrets already cleaned\" }; \
 };\n")
 
 :return $OUT

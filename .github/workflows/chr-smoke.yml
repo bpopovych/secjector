@@ -2,8 +2,8 @@ name: CHR smoke (QEMU no-KVM)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 3 * * *" # nightly smoke
+  # schedule:
+  #   - cron: "0 3 * * *" # nightly smoke
 
 jobs:
   chr-smoke:

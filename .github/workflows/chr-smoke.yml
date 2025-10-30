@@ -113,14 +113,16 @@ jobs:
             secrets.rsc \
             tests/secrets.yaml \
             tests/integration/example_main.rsc \
+            tests/integration/ci_runner.rsc \
             admin@127.0.0.1:
 
       - name: Run injector smoke test
         run: |
           ssh_opts=(-p 2222 -o StrictHostKeyChecking=no)
-          # Use :parse instead of /import for RouterOS 7.20.x compatibility
+          # Use /import for ci_runner which outputs results
+          # (ci_runner uses :parse internally for example_main.rsc)
           ssh "${ssh_opts[@]}" admin@127.0.0.1 \
-            ':parse [/file get "example_main.rsc" contents]' \
+            '/import file-name=ci_runner.rsc' \
             | tee ci-run.log
           grep -q 'TEST_OK:' ci-run.log
 

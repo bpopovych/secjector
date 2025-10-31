@@ -34,3 +34,25 @@ nav:
 markdown_extensions:
   - admonition
   - tables
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - def_list
+  - md_in_html
+extra_css:
+  - stylesheets/maintainers.css
+extra:
+  version:
+    provider: mike

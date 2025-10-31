@@ -1,0 +1,61 @@
+/* Custom info admonition styling */
+.md-typeset .admonition.info,
+.md-typeset details.info {
+  border-left: 0.25rem solid #009688;
+  background-color: rgba(0, 150, 136, 0.05);
+}
+
+.md-typeset .admonition.info .admonition-title {
+  background-color: rgba(0, 150, 136, 0.12);
+  color: #004d40;
+  font-weight: 600;
+}
+
+/* Code block enhancements */
+.md-typeset code {
+  background-color: rgba(0, 150, 136, 0.08);
+  padding: 0.1em 0.4em;
+  border-radius: 0.2em;
+}
+
+/* RouterOS code highlighting */
+.md-typeset pre code.language-routeros,
+.md-typeset pre code.language-rsc {
+  background-color: #263238;
+}
+
+/* Table styling improvements */
+.md-typeset table:not([class]) {
+  border: 1px solid rgba(0, 150, 136, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.md-typeset table:not([class]) th {
+  background-color: rgba(0, 150, 136, 0.1);
+  font-weight: 600;
+}
+
+/* Warning/compatibility notes */
+.md-typeset .admonition.warning {
+  border-left-color: #ff9800;
+}
+
+.md-typeset .admonition.danger {
+  border-left-color: #f44336;
+}
+
+/* Success/tested badges */
+.md-typeset .admonition.success {
+  border-left-color: #4caf50;
+}
+
+/* Version badge styling */
+.md-typeset .badge {
+  display: inline-block;
+  padding: 0.25em 0.5em;
+  font-size: 0.85em;
+  font-weight: 600;
+  border-radius: 0.25em;
+  background-color: rgba(0, 150, 136, 0.15);
+  color: #004d40;
+}

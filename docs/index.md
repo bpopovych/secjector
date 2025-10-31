@@ -1,18 +1,20 @@
 # Secjector
 
-Secjector is a tiny RouterOS v7 secrets injector that keeps credentials scoped to the caller by generating local helper functions on demand. It is designed for air-gapped, one-off provisioning flows where you need repeatable scripts without dumping secrets into `/system/script/environment`.
+Secjector is a tiny RouterOS v7.20+ secrets injector for MikroTik devices. It generates global helper functions to access secrets from flat YAML files. Tested on bare metal RouterOS 7.20.2 (ARM).
 
 ## Highlights
-- Single `[:parse ...]` line to load helpers from `secrets.rsc`
+- Two-line `[:parse ...]` injection pattern (RouterOS 7.20.x compatible)
 - Flat YAML input (multiline blocks supported) → `$secret "key"` lookups
-- Fail-fast validation via `$secret_require` and opt-in warning mode
-- No globals or environment variables left behind after execution
+- Supports keys with colons, spaces, and special characters
+- Fail-fast validation via `$secretRequire` and opt-in warning mode
+- Uses `:global` functions and variables (RouterOS 7.20.x requirement)
 
 ## Quick start
 ```rsc
-# optional: :local __secret__handling__mode "warn"
-[:parse [[:parse [/file get "secrets.rsc" contents]]]]
-[$secret_require {"wifi_password";"api_key"}]
+# optional: :local secretHandlingMode "warn"
+[:parse [/file get "secrets.rsc" contents]]
+[:parse $OUT]
+[$secretRequire {"wifi_password";"api_key"}]
 /user add name="ops" group=full password=[$secret "wifi_password"]
 ```
 

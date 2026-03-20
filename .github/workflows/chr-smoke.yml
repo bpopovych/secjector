@@ -1,25 +1,36 @@
 ---
-name: CHR smoke (QEMU no-KVM)
+name: CHR smoke (Docker + KVM)
 
 'on':
   workflow_dispatch:
-  # schedule:
-  #   - cron: "0 3 * * *" # nightly smoke
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   chr-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    env:
+      SSHPASS: ""
+      SSH_OPTS: >-
+        -o StrictHostKeyChecking=no
+        -o UserKnownHostsFile=/dev/null
+        -o PubkeyAuthentication=no
+        -o PreferredAuthentications=keyboard-interactive
+        -p 2222
+      SCP_OPTS: >-
+        -o StrictHostKeyChecking=no
+        -o UserKnownHostsFile=/dev/null
+        -o PubkeyAuthentication=no
+        -o PreferredAuthentications=keyboard-interactive
+        -P 2222
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      # Optional: quick visibility if something's off
-      # - name: Debug workspace
-      #   run: |
-      #     find . -maxdepth 3 -type f -print | sort
 
       - name: Sanity check required files
         run: |
@@ -28,6 +39,7 @@ jobs:
             secrets.rsc
             tests/secrets.yaml
             tests/integration/example_main.rsc
+            tests/integration/ci_runner.rsc
           )
           for f in "${files[@]}"; do
             echo "check:$f"
@@ -35,81 +47,44 @@ jobs:
           done
 
       - name: Install deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            qemu-system-x86 \
-            qemu-utils \
-            unzip \
-            expect \
-            openssh-client \
-            curl
+        run: sudo apt-get update && sudo apt-get install -y expect openssh-client sshpass
 
-      - name: Fetch CHR image
+      - name: Boot CHR via Docker
         run: |
-          VER="7.20.2"   # tested and working on bare metal
-          url="https://download.mikrotik.com/routeros/${VER}/chr-${VER}.img.zip"
-          curl -fsSLO "$url"
-          unzip -q "chr-${VER}.img.zip"
-          qemu-img convert -f raw -O qcow2 "chr-${VER}.img" chr.qcow2
+          # Pass /dev/kvm if available (GitHub Actions ubuntu-latest supports it).
+          # chr-start.sh also checks inside the container and enables KVM in QEMU.
+          KVM_DEVICE=""
+          [ -e /dev/kvm ] && KVM_DEVICE="--device /dev/kvm"
 
-      - name: Boot CHR (background)
-        run: |
-          nohup qemu-system-x86_64 \
-            -name "chr-ci" \
-            -m 256 -smp 1 \
-            -drive file=chr.qcow2,if=virtio,format=qcow2 \
-            -nographic -monitor none \
-            -serial telnet:127.0.0.1:5555,server,nowait \
-            -netdev user,id=n1,hostfwd=tcp::2222-:22 \
-            -device virtio-net-pci,netdev=n1 \
-            -cpu max -machine accel=tcg \
-            > qemu.log 2>&1 & echo $! > qemu.pid
-          sleep 15
-          echo "QEMU PID=$(cat qemu.pid)"
+          chmod +x .github/scripts/chr-start.sh
+          docker run -d --name chr \
+            $KVM_DEVICE \
+            -p 2222:2222 \
+            -p 5555:5555 \
+            -v "$PWD/.github/scripts/chr-start.sh:/chr-start.sh" \
+            --entrypoint /chr-start.sh \
+            mikrotik/chr:stable
+          sleep 10
 
       - name: Configure CHR via serial (expect)
-        run: |
-          cat > serial-setup.exp <<'EOF'
-          #!/usr/bin/expect -f
-          set timeout 180
-          spawn telnet 127.0.0.1 5555
-          expect {
-            -re "Login:" {}
-            -re "MikroTik RouterOS" { exp_continue }
-          }
-          send -- "admin\r"
-          expect {
-            -re "Password:" { send -- "\r" }
-            -re "logged in" {}
-          }
-          # Basic net + SSH
-          send -- "/ip address add address=10.0.2.15/24 interface=ether1 "
-          send -- "comment=ci\r"
-          send -- "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2\r"
-          send -- "/ip service set ssh disabled=no port=22\r"
-          send -- "quit\r"
-          expect eof
-          EOF
-          chmod +x serial-setup.exp
-          ./serial-setup.exp
+        run: expect .github/scripts/serial-setup.exp
 
       - name: Wait for SSH
         run: |
-          ssh_base="ssh -o StrictHostKeyChecking=no -o ConnectTimeout=2 -p 2222"
           for i in {1..30}; do
-            if $ssh_base admin@127.0.0.1 \
-              ":put [/system resource get version]" 2>/dev/null; then
+            if sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
+              ':put [/system resource get version]' 2>/dev/null; then
               echo "SSH up"; exit 0
             fi
             sleep 2
           done
-          echo "SSH did not come up"; cat qemu.log; exit 1
+          echo "SSH did not come up"
+          docker logs chr
+          exit 1
 
       - name: Push test files
         run: |
-          scp_opts=(-P 2222 -o StrictHostKeyChecking=no)
-          scp "${scp_opts[@]}" \
+          sshpass -e scp $SCP_OPTS \
             secrets.rsc \
             tests/secrets.yaml \
             tests/integration/example_main.rsc \
@@ -118,17 +93,19 @@ jobs:
 
       - name: Run injector smoke test
         run: |
-          ssh_opts=(-p 2222 -o StrictHostKeyChecking=no)
-          # Use /import for ci_runner which outputs results
-          # (ci_runner uses :parse internally for example_main.rsc)
-          ssh "${ssh_opts[@]}" admin@127.0.0.1 \
-            '/import file-name=ci_runner.rsc' \
-            | tee ci-run.log
-          grep -q 'TEST_OK:' ci-run.log
+          sshpass -e ssh $SSH_OPTS admin@127.0.0.1 '/import file-name=ci_runner.rsc'
 
-      - name: Teardown QEMU
-        if: always()
+          result=$(sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
+            ':put [/file get ci-result.txt contents]')
+          echo "result: $result"
+          echo "$result" | grep -q 'TEST_OK:'
+
+      - name: Show router log on failure
+        if: failure()
         run: |
-          if [[ -f qemu.pid ]]; then kill -TERM "$(cat qemu.pid)" || true; fi
-          sleep 3
-          ps aux | grep qemu || true
+          sshpass -e ssh $SSH_OPTS admin@127.0.0.1 '/log print' 2>/dev/null || true
+          docker logs chr 2>&1 | tail -50
+
+      - name: Teardown
+        if: always()
+        run: docker stop chr 2>/dev/null || true; docker rm chr 2>/dev/null || true

@@ -1,0 +1,25 @@
+#!/usr/bin/expect -f
+# Configure CHR via serial console after first boot.
+# Sets up IP, default route, and enables SSH.
+set timeout 180
+
+spawn telnet 127.0.0.1 5555
+
+expect {
+    -re "Login:" {}
+    -re "MikroTik RouterOS" { exp_continue }
+}
+send -- "admin\r"
+expect {
+    -re "Password:" { send -- "\r" }
+    -re "logged in" {}
+}
+
+send -- "/ip address add address=10.0.2.15/24 interface=ether1 comment=ci\r"
+expect -re {\[.*\].*> }
+send -- "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2\r"
+expect -re {\[.*\].*> }
+send -- "/ip service set ssh disabled=no port=22\r"
+expect -re {\[.*\].*> }
+send -- "quit\r"
+expect eof

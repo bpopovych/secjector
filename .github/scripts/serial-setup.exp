@@ -1,6 +1,7 @@
 #!/usr/bin/expect -f
 # Configure CHR via serial console after first boot.
-# Sets up IP, default route, and enables SSH.
+# Handles RouterOS 7.22+ first-login password change wizard,
+# then sets up IP, default route, and enables SSH.
 set timeout 180
 
 spawn telnet 127.0.0.1 5555
@@ -12,6 +13,24 @@ expect {
 send -- "admin\r"
 expect {
     -re "Password:" { send -- "\r" }
+    -re "logged in" {}
+}
+
+# RouterOS 7.22+ requires setting a new password on first login.
+# Set it to "ci" so all subsequent SSH calls can use it.
+expect {
+    -re {New password:} {
+        send -- "ci\r"
+        expect -re {Repeat new password:}
+        send -- "ci\r"
+    }
+    -re {\[.*\].*> } {}
+    -re "logged in" {}
+}
+
+# Wait for the prompt in case the password wizard just completed
+expect {
+    -re {\[.*\].*> } {}
     -re "logged in" {}
 }
 

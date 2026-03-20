@@ -13,7 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      SSHPASS: ""
+      # Password set by serial-setup.exp on first boot (RouterOS 7.22+
+      # requires a password change wizard before allowing SSH login).
+      SSHPASS: "ci"
       SSH_OPTS: >-
         -o StrictHostKeyChecking=no
         -o UserKnownHostsFile=/dev/null
@@ -47,15 +49,16 @@ jobs:
           done
 
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y expect openssh-client sshpass
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y expect openssh-client sshpass
 
       - name: Boot CHR via Docker
         run: |
-          # Pass /dev/kvm if available (GitHub Actions ubuntu-latest supports it).
-          # chr-start.sh also checks inside the container and enables KVM in QEMU.
+          # chr-start.sh replaces start.sh (bridge networking) with
+          # -netdev user + port forwarding so CI can reach SSH on 2222.
           KVM_DEVICE=""
           [ -e /dev/kvm ] && KVM_DEVICE="--device /dev/kvm"
-
           chmod +x .github/scripts/chr-start.sh
           docker run -d --name chr \
             $KVM_DEVICE \
@@ -73,7 +76,8 @@ jobs:
         run: |
           for i in {1..30}; do
             if sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
-              ':put [/system resource get version]' 2>/dev/null; then
+              ':put [/system resource get version]' 2>/dev/null
+            then
               echo "SSH up"; exit 0
             fi
             sleep 2
@@ -93,8 +97,8 @@ jobs:
 
       - name: Run injector smoke test
         run: |
-          sshpass -e ssh $SSH_OPTS admin@127.0.0.1 '/import file-name=ci_runner.rsc'
-
+          sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
+            '/import file-name=ci_runner.rsc'
           result=$(sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
             ':put [/file get ci-result.txt contents]')
           echo "result: $result"
@@ -103,9 +107,12 @@ jobs:
       - name: Show router log on failure
         if: failure()
         run: |
-          sshpass -e ssh $SSH_OPTS admin@127.0.0.1 '/log print' 2>/dev/null || true
+          sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
+            '/log print' 2>/dev/null || true
           docker logs chr 2>&1 | tail -50
 
       - name: Teardown
         if: always()
-        run: docker stop chr 2>/dev/null || true; docker rm chr 2>/dev/null || true
+        run: |
+          docker stop chr 2>/dev/null || true
+          docker rm chr 2>/dev/null || true

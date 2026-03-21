@@ -27,4 +27,4 @@
 
 :local ciResult ("TEST_OK:" . $wifiLen . ":" . $apiLen . ":" . $colonLen . ":" . $spaceLen . ":" . $leadingLen . ":" . $certHas . ":" . $hasMissing . ":" . $cleanupRes . ":" . $hasAfter)
 :do { /file remove [find name=ci-result.txt] } on-error={}
-/file add name=ci-result.txt type=.txt contents=$ciResult
+/file add name=ci-result.txt contents=$ciResult

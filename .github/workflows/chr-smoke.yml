@@ -116,6 +116,7 @@ jobs:
             tests/secrets.yaml \
             tests/integration/example_main.rsc \
             tests/integration/ci_runner.rsc \
+            tests/integration/diag.rsc \
             admin@127.0.0.1:
 
       - name: Run injector smoke test
@@ -130,8 +131,8 @@ jobs:
       - name: Show router log on failure
         if: failure()
         run: |
-          sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
-            '/log print' 2>/dev/null || true
+          sshpass -e ssh $SSH_OPTS admin@127.0.0.1 '/log print' 2>/dev/null || true
+          sshpass -e ssh $SSH_OPTS admin@127.0.0.1 '/import file-name=diag.rsc' 2>&1 || true
           docker logs chr 2>&1 | tail -50
 
       - name: Teardown

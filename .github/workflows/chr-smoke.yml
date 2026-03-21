@@ -11,7 +11,7 @@ name: CHR smoke (Docker + KVM)
 jobs:
   chr-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       # Password set by serial-setup.exp on first boot (RouterOS 7.22+
       # requires a password change wizard before allowing SSH login).
@@ -57,17 +57,40 @@ jobs:
         run: |
           # chr-start.sh replaces start.sh (bridge networking) with
           # -netdev user + port forwarding so CI can reach SSH on 2222.
-          KVM_DEVICE=""
-          [ -e /dev/kvm ] && KVM_DEVICE="--device /dev/kvm"
+          #
+          # KVM: pass /dev/kvm and its group so QEMU inside the container
+          # can use hardware acceleration (github ubuntu-latest supports KVM).
+          KVM_OPTS=""
+          if [ -e /dev/kvm ]; then
+            KVM_GID=$(stat -c %g /dev/kvm)
+            KVM_OPTS="--device /dev/kvm --group-add $KVM_GID"
+            echo "KVM available (gid=$KVM_GID)"
+          else
+            echo "WARNING: /dev/kvm not found - TCG mode (slow boot)"
+          fi
+
           chmod +x .github/scripts/chr-start.sh
+          # shellcheck disable=SC2086
           docker run -d --name chr \
-            $KVM_DEVICE \
+            $KVM_OPTS \
             -p 2222:2222 \
             -p 5555:5555 \
             -v "$PWD/.github/scripts/chr-start.sh:/chr-start.sh" \
             --entrypoint /chr-start.sh \
             mikrotik/chr:stable
-          sleep 10
+
+          # Wait for QEMU to bind port 5555 (serial telnet console)
+          echo "Waiting for QEMU serial port..."
+          for i in $(seq 1 60); do
+            nc -z 127.0.0.1 5555 2>/dev/null && \
+              echo "port 5555 ready (${i}s)" && break
+            [ "$i" -eq 60 ] && \
+              { echo "port 5555 never came up"; docker logs chr; exit 1; }
+            sleep 1
+          done
+
+          echo "=== QEMU startup (docker logs) ==="
+          docker logs chr 2>&1 | head -5
 
       - name: Configure CHR via serial (expect)
         run: expect .github/scripts/serial-setup.exp

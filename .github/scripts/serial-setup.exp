@@ -2,7 +2,7 @@
 # Configure CHR via serial console after first boot.
 # Handles RouterOS 7.22+ first-login password change wizard,
 # then sets up IP, default route, and enables SSH.
-set timeout 180
+set timeout 300
 
 spawn telnet 127.0.0.1 5555
 

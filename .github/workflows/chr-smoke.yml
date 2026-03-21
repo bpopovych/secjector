@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # Password set by serial-setup.exp on first boot (RouterOS 7.22+
-      # requires a password change wizard before allowing SSH login).
-      SSHPASS: "ci"
+      # Empty password: serial-setup.exp skips the RouterOS 7.22+ wizard
+      # with Ctrl-C so the default empty admin password is preserved.
+      SSHPASS: ""
       SSH_OPTS: >-
         -o StrictHostKeyChecking=no
         -o UserKnownHostsFile=/dev/null
@@ -125,7 +125,7 @@ jobs:
           result=$(sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
             ':put [/file get ci-result.txt contents]')
           echo "result: $result"
-          echo "$result" | grep -q 'TEST_OK:'
+          echo "$result" | grep -qx 'TEST_OK:12:19:5:6:7:T:F:SKIP:N/A'
 
       - name: Show router log on failure
         if: failure()

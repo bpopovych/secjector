@@ -2,43 +2,43 @@
 # Configure CHR via serial console after first boot.
 # Handles RouterOS 7.22+ first-login password change wizard,
 # then sets up IP, default route, and enables SSH.
-set timeout 300
+set timeout 60
 
 spawn telnet 127.0.0.1 5555
 
+# Wait for login prompt (RouterOS prints its banner first)
 expect {
-    -re "Login:" {}
-    -re "MikroTik RouterOS" { exp_continue }
+    -re {Login:} {}
+    -re {MikroTik} { exp_continue }
 }
 send -- "admin\r"
+
+# RouterOS may ask for a password (empty by default)
 expect {
-    -re "Password:" { send -- "\r" }
-    -re "logged in" {}
+    -re {Password:} { send -- "\r" }
+    -re {logged in}  {}
 }
 
-# RouterOS 7.22+ requires setting a new password on first login.
-# Set it to "ci" so all subsequent SSH calls can use it.
+# RouterOS 7.22+ shows a password-change wizard on first login.
+# Exact prompts: "Please enter new password:" / "Please repeat new password:"
 expect {
-    -re {New password:} {
+    -re {(?i)new password} {
         send -- "ci\r"
-        expect -re {Repeat new password:}
+        expect -re {(?i)repeat}
         send -- "ci\r"
     }
-    -re {\[.*\].*> } {}
-    -re "logged in" {}
+    -re {\[.*\].*>} {}
+    -re {logged in}  {}
 }
 
-# Wait for the prompt in case the password wizard just completed
-expect {
-    -re {\[.*\].*> } {}
-    -re "logged in" {}
-}
+# Wait for the command prompt (post-wizard or direct login)
+expect -re {\[.*\].*>}
 
 send -- "/ip address add address=10.0.2.15/24 interface=ether1 comment=ci\r"
-expect -re {\[.*\].*> }
+expect -re {\[.*\].*>}
 send -- "/ip route add dst-address=0.0.0.0/0 gateway=10.0.2.2\r"
-expect -re {\[.*\].*> }
+expect -re {\[.*\].*>}
 send -- "/ip service set ssh disabled=no port=22\r"
-expect -re {\[.*\].*> }
+expect -re {\[.*\].*>}
 send -- "quit\r"
 expect eof

@@ -124,7 +124,7 @@ jobs:
           sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
             '/import file-name=ci_runner.rsc'
           result=$(sshpass -e ssh $SSH_OPTS admin@127.0.0.1 \
-            ':put [/file get ci-result.txt contents]')
+            ':put [/file get ci-result.txt contents]' | tr -d '\r')
           echo "result: $result"
           echo "$result" | grep -qx 'TEST_OK:12:19:5:6:7:T:F:SKIP:N/A'
 

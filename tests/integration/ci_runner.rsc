@@ -12,9 +12,6 @@
 
 :global secret
 :global secretHas
-:global secretRequire
-
-[$secretRequire {"wifi_password";"api_key"}]
 
 :local wifiLen   [:len [$secret "wifi_password"]]
 :local apiLen    [:len [$secret "api_key"]]

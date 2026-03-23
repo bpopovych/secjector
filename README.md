@@ -1,37 +1,24 @@
-# Secjector - secrets injector for MikroTik RouterOS `.rsc`
+# Secjector — secrets injector for MikroTik RouterOS `.rsc`
 
-> **Tagline:** *Tiny secrets accessor for RouterOS scripts. Two-liner to load. Flat YAML in, `$secret "key"` out.*
+> *Tiny secrets accessor for RouterOS scripts. Two lines to load. Flat YAML in, `$secret "key"` out.*
 
-![license](https://img.shields.io/badge/license-MIT-green) ![ros](https://img.shields.io/badge/routeros-v7.20%2B-informational) ![tested](https://img.shields.io/badge/tested-bare%20metal-success)
+![license](https://img.shields.io/badge/license-MIT-green)
+![ros](https://img.shields.io/badge/routeros-7.20%2B-informational)
+![ci](https://github.com/bpopovych/secjector/actions/workflows/chr-smoke.yml/badge.svg)
 
-Secjector helps you use secrets in RouterOS scripts with a simple injection pattern. Tested on bare metal RouterOS 7.20.x hardware. Default behavior fails fast if a key is missing.
-
-**✅ Tested on RouterOS 7.20.2 (ARM) - MikroTik hAP ac²**
+Secjector helps you use secrets in RouterOS scripts. Load `secrets.rsc` with two `:parse` calls; it exposes `$secret`, `$secretHas`, and `$secretRequire` as `:global` functions. Default behaviour fails fast on a missing key.
 
 ## Why Secjector?
-- **Two-line injection** in your `.rsc` (tested on RouterOS 7.20.x)
-- **Supports keys with colons, spaces, and special characters** (e.g., `colon:key`, `space key`, `@leading`)
+
+- **Two-line injection** — no `/import`, no custom packages
+- **Flat YAML input** — multiline `|` blocks supported
+- **Special-character keys** — colons, spaces, `@`, hyphens all work when quoted
 - **No `/system/script/environment`** required
-- **Flat YAML input**, supports multiline via `|` blocks
-- **Configurable missing-key policy**: `error` (default) or `warn`
+- **Configurable missing-key policy** — `error` (default) or `warn`
 
 ## Quick start
 
-**examples/main.rsc**
-```rsc
-# Two-line injection (RouterOS 7.20.x compatible)
-[:parse [/file get "secrets.rsc" contents]]
-[:parse $OUT]
-
-# Validate and use (note: camelCase function names for RouterOS 7.20.x)
-[$secretRequire {"wifi_password";"api_key"}]
-/user add name="ops" group=full password=[$secret "wifi_password"]
-
-# For storing values, use :global (RouterOS 7.20.x limitation)
-:global myPass [$secret "wifi_password"]
-```
-
-**examples/secrets.yaml**
+**`secrets.yaml`**
 ```yaml
 wifi_password: my_super_secret_password
 api_key: "some long key with spaces"
@@ -41,82 +28,88 @@ cert_pem: |
   -----END CERTIFICATE-----
 ```
 
-## Hyphens, underscores, and quoting
-
-Use string keys with quotes for reliability:
-
-- `[$secret "wifi_password"]` - good
-- `[$secret "wifi-password"]` - good (hyphen allowed in YAML key)
-- `[$secret wifi_password]` - only if you defined `:local wifi_password "wifi_password"` first (not recommended)
-- `[$secret wifi-password]` - will NOT work (bare token with hyphen is not a valid variable name)
-
-**Rule:** always quote the key string you pass to `$secret`.
-
-## RouterOS 7.20.x Compatibility
-
-Secjector has been extensively tested and fixed for RouterOS 7.20.x on bare metal hardware. Key changes for compatibility:
-
-### Function Names
-- ✅ `$secret` - Get secret value
-- ✅ `$secretHas` - Check if secret exists (renamed from `secret_has`)
-- ✅ `$secretRequire` - Validate required secrets (renamed from `secret_require`)
-- ❌ `$secretCleanup` - Disabled (RouterOS 7.20.x cannot `:set` function variables)
-
-### Usage Pattern
+**`main.rsc`**
 ```rsc
-# Use :parse, NOT /import (imports run in isolated scope)
+# Load secrets (two separate :parse calls — they cannot be nested)
 [:parse [/file get "secrets.rsc" contents]]
 [:parse $OUT]
 
-# Direct usage in expressions works:
-/user add password=[$secret "wifi_password"]
+# Use directly in expressions (preferred)
+/user add name="ops" group=full password=[$secret "wifi_password"]
 
-# To store values, use :global (NOT :local):
-:global myPass [$secret "wifi_password"]  # ✅ Works
-:local myPass [$secret "wifi_password"]   # ❌ Returns empty
+# Or store in a local variable
+:local pass [$secret "wifi_password"]
 ```
 
-### Limitations
-- **Cannot use `:local` for storing function return values** - use `:global` or direct expressions
-- **Cannot use `/import`** - use `:parse [/file get ...]` pattern instead
-- **`secretCleanup` not available** - RouterOS 7.20.x limitation
+## Key quoting rules
 
-## CI smoke test
+Always pass a quoted string key to `$secret`:
 
-We provide `.github/workflows/chr-smoke.yml` that boots CHR under QEMU (no KVM) and runs a tiny smoke test via SSH. Details in **docs/ci.md**.
+| Call | Works? | Notes |
+|------|--------|-------|
+| `[$secret "wifi_password"]` | ✅ | recommended |
+| `[$secret "space key"]` | ✅ | quoted handles spaces |
+| `[$secret "colon:key"]` | ✅ | quoted handles colons |
+| `[$secret wifi_password]` | ⚠️ | only if `$wifi_password` variable is defined |
+| `[$secret wifi-password]` | ❌ | bare hyphen token is invalid |
+
+## RouterOS compatibility
+
+Secjector targets RouterOS 7.20+. CI runs against CHR 7.22 (`mikrotik/chr:stable`) on every push.
+
+### Available functions
+
+| Function | Purpose |
+|----------|---------|
+| `$secret "key"` | Returns the value; errors if missing (or warns in `warn` mode) |
+| `$secretHas "key"` | Boolean — `true` if the key exists and is non-empty |
+| `$secretRequire` | Validates a list of keys; errors/warns if any are missing |
+
+`$secretCleanup` is **not available** — RouterOS cannot `:set` a `:global` function variable.
+
+### Known constraints
+
+- Use `:parse [/file get ...]`, **not** `/import` — imports run in an isolated scope where globals do not persist
+- The two `:parse` calls **cannot** be nested into one line — RouterOS global scope does not propagate across nested `:parse` boundaries
+- All generated functions and the secret map are `:global`
+
+### Modes
+
+```rsc
+:local secretHandlingMode "warn"   # set before loading; default is "error"
+[:parse [/file get "secrets.rsc" contents]]
+[:parse $OUT]
+```
+
+## CI
+
+`.github/workflows/chr-smoke.yml` boots the official `mikrotik/chr:stable` Docker image (RouterOS 7.22) with KVM acceleration on every push and PR to `main`. It copies `secrets.rsc` and `tests/secrets.yaml` to the router over SSH, runs the integration script, and asserts the exact expected result string.
 
 ## Install
 
 ```bash
-git clone https://github.com/REPLACE_ORG/secjector
+git clone https://github.com/bpopovych/secjector
 cd secjector
-# optional docs build:
-make docs
+make test        # unit + regression checks
+make docs        # optional MkDocs site
 ```
 
-## Versioning
+## Architecture
 
-- SemVer starting at **v0.1.x**.
-- Current: **v0.1.3** (RouterOS 7.20.x compatibility update)
-
-## Roadmap (short)
-
-- v0.2: optional `/tool fetch` support for `http/https` sources (presigned URL), ephemeral file, then delete.
-- Optional checksum print (keys+lengths) for verification.
-- Optional masked logging in `warn` mode.
-
-## Mermaid overview
 ```mermaid
 flowchart LR
-  A[main.rsc] -->|"[:parse [/file get secrets.rsc]]"| B[secrets.rsc]
-  B -->|"returns $OUT"| A
-  A -->|"[:parse $OUT]"| A
-  A -->|"creates :global functions"| E[:global secret]
-  A -->|"creates :global map"| D[(:global secretMap)]
-  A -->|calls| C["$secret \"wifi_password\""]
-  C --> D
-  E -.references.-> D
+  A[main.rsc] -->|"[:parse [/file get 'secrets.rsc' contents]]"| B[secrets.rsc]
+  B -->|"sets :global OUT"| A
+  A -->|"[:parse \$OUT]"| C[generated code]
+  C -->|"defines"| D[":global secret\n:global secretHas\n:global secretMap"]
+  A -->|calls| D
 ```
+
+## Roadmap
+
+- v0.2: `/tool fetch` support for HTTP/HTTPS sources (presigned URL), ephemeral file, then delete
+- Optional checksum print (key lengths) for verification
+- Optional masked logging in `warn` mode
 
 ## License
 

@@ -1,46 +1,48 @@
 # Testing & CI
 
-Secjector ships with fast local checks plus a full MikroTik Cloud Hosted Router (CHR) smoke test that runs under QEMU in GitHub Actions. The combination guards both the RouterOS script generator and the workflow that exercises it on real firmware.
+Secjector ships with fast local checks plus a full MikroTik Cloud Hosted Router (CHR) smoke test that runs in GitHub Actions on every push and PR. The combination guards both the RouterOS script generator and the workflow that exercises it on real firmware.
 
 ## Test matrix
 
 | Scope | Command / Workflow | What it covers |
-| --- | --- | --- |
-| Static regression guard | `make test` | README and example sanity plus `tests/unit/test_regressions.py`, which enforces key unquoting, key escaping, and the `$secret_cleanup` rebinding contract |
-| RouterOS integration (ad-hoc) | `make test-integration` | Pushes test fixtures to a RouterOS host (via `ROUTER_HOST`/`ROUTER_USER`/`ROUTER_IDENT`) and asserts lengths + cleanup behaviour reported by the script |
-| CHR smoke on GitHub Actions | `.github/workflows/chr-smoke.yml` | Boots CHR 7.17.x under QEMU (no KVM), configures it over the serial console, copies the fixtures, and runs the same integration script nightly |
-
-All tests share the same fixtures (`tests/secrets.yaml`, `tests/integration/example_main.rsc`), so any additional edge cases you add to those files will automatically flow through every layer.
+|-------|--------------------|----------------|
+| Static regression guard | `make test` | Repo sanity plus `tests/unit/test_regressions.py`, which enforces key unquoting, key escaping, and other critical code patterns in `secrets.rsc` |
+| RouterOS integration (ad-hoc) | `make test-integration` | Pushes test fixtures to a live RouterOS host (via `ROUTER_HOST`/`ROUTER_USER`/`ROUTER_IDENT`) and asserts the exact result string |
+| CHR smoke on GitHub Actions | `.github/workflows/chr-smoke.yml` | Boots CHR 7.22 via Docker with KVM, configures it over the serial console, copies the fixtures, runs the integration script, and verifies the exact output |
 
 ## Edge cases covered
 
-The integration script prints a `TEST_OK` marker with several counters that confirm:
+The integration script (`tests/integration/ci_runner.rsc`) prints a `TEST_OK` marker with counters that confirm:
 
 - YAML keys that require quoting (spaces, colons, leading `@`) resolve correctly
 - Multiline block scalars preserve the word `CERTIFICATE`
-- `$secret_has` returns `false` for missing keys
-- `$secret_cleanup` prevents all subsequent helper access and errors on re-entry
+- `$secretHas` returns `false` for missing keys
 
-The static regression guard also ensures the RouterOS parser keeps unquoting keys and escaping them before populating the local map.
+Expected result: `TEST_OK:12:19:5:6:7:T:F:SKIP:N/A`
+
+The static regression guard also ensures critical patterns in `secrets.rsc` remain intact across edits (e.g. `$helperUnquote` used for key unquoting, `---` YAML marker handling).
 
 ## CHR smoke workflow
 
-The `chr-smoke` GitHub Action uses the same integration script but runs it on a freshly booted CHR instance.
+The `chr-smoke` GitHub Action runs on every push and PR to `main`, and can also be triggered manually via `workflow_dispatch`.
 
 - Runner: `ubuntu-latest` (GitHub-hosted)
-- Acceleration: Tiny Code Generator (TCG), because KVM is unavailable in GitHub-hosted runners
-- Purpose: nightly correctness smoke, not performance benchmarking
+- Image: `mikrotik/chr:stable` (RouterOS 7.22)
+- Acceleration: KVM passthrough (`--device /dev/kvm` + `--group-add`) — boot takes ~12 seconds
 
 ### How it works
-1. Download the CHR image (update the version in the workflow when you need newer firmware).
-2. Boot with QEMU using user-mode NAT, forwarding host TCP 2222 → guest 22.
-3. Connect to the **serial console** with `telnet` + `expect` and configure:
-   - IP `10.0.2.15/24` on `ether1`
-   - Default route via `10.0.2.2` (QEMU's user-mode gateway)
+
+1. Start the `mikrotik/chr:stable` Docker container with a custom QEMU startup script that enables KVM and forwards host TCP 2222 → guest SSH port 22.
+2. Connect to the **serial console** via telnet + expect and configure:
+   - Skip the first-login wizard (Ctrl-C)
+   - Add default route via `10.0.2.2` (QEMU user-mode gateway)
    - Enable the SSH service
-4. `scp` the test files and run `/import file-name=example_main.rsc` to verify `secrets.rsc`.
-5. Tear down QEMU gracefully even if the run fails, so the runner is left clean.
+3. Wait for SSH to become available.
+4. `scp` `secrets.rsc`, `tests/secrets.yaml`, and the integration scripts to the router.
+5. Run `/import file-name=ci_runner.rsc` via SSH; the script writes its result to `ci-result.txt`.
+6. Read `ci-result.txt` via a second SSH call and assert the exact expected string.
+7. Tear down the Docker container (happens even on failure).
 
 ### Cost considerations
 
-GitHub bills this workflow as a standard VM job. If you want free runs, switch to a self-hosted runner, reduce the schedule in the workflow, or execute it on demand via `workflow_dispatch`.
+GitHub bills this workflow as standard hosted-runner VM minutes. Each push and PR to `main` triggers a run (~2 minutes). Use `workflow_dispatch` for on-demand runs, or a self-hosted runner to eliminate charges.

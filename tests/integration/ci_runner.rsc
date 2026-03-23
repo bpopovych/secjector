@@ -1,14 +1,11 @@
-# CI runner - directly tests the injection pattern.
-# Mirrors real-world usage:
-#   [:parse [/file get "secrets.rsc" contents]]
-#   [:parse $OUT]
-# and then calls the accessor functions.
+# CI runner - tests the single-line injection pattern.
+# Mirrors real-world usage (one line):
+#   [:parse [:parse [/file get "secrets.rsc" contents]]]
 #
 # Writes result to ci-result.txt (read via a second SSH call) because
 # /import suppresses :put output on SSH sessions.
 
-[:parse [/file get "secrets.rsc" contents]]
-[:parse $OUT]
+[:parse [:parse [/file get "secrets.rsc" contents]]]
 
 :global secret
 :global secretHas

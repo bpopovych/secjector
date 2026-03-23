@@ -188,5 +188,5 @@
 # secretCleanup() -> disable accessors (NOTE: not supported in RouterOS 7.20.x due to :set/:local restrictions)
 # :set OUT ($OUT . ":local secretCleanup do={ :set secret do={ :error \"secrets cleaned\" }; :set secretHas do={ :return false }; :set secretRequire do={ :error \"secrets cleaned\" }; :set secretCleanup do={ :error \"secrets already cleaned\" }; };\n")
 
-# NOTE: Due to RouterOS limitations, result is in global $OUT
-# Caller should use: [:parse $OUT] instead of [:parse [return value]]
+# Return $OUT so callers can use single-line: [:parse [:parse [/file get "secrets.rsc" contents]]]
+:return $OUT

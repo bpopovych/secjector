@@ -210,9 +210,9 @@ def test_special_chars_in_key():
 def test_integration_expected_values():
     """
     Test that the integration test expectations are correct.
-    Based on tests/secrets.yaml and tests/integration/example_main.rsc
+    Based on tests/secrets.yaml and tests/integration/ci_runner.rsc
     """
-    # From test_apply.sh: expected="TEST_OK:12:19:5:6:7:T:F:OK:F"
+    # CHR smoke expected: "TEST_OK:12:19:5:6:7:T:F:SKIP:N/A"
     # These are lengths of:
     # wifi_password (12), api_key (19), colon:key (5), space key (6), @leading (7)
 

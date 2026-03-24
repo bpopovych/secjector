@@ -1,20 +1,19 @@
 # Secjector
 
-Secjector is a tiny RouterOS v7.20+ secrets injector for MikroTik devices. It generates global helper functions to access secrets from flat YAML files. Tested on bare metal RouterOS 7.20.2 (ARM).
+Secjector is a tiny RouterOS 7.20+ secrets injector for MikroTik devices. It generates global helper functions to access secrets from flat YAML files. CI-tested against CHR 7.22 on every push.
 
 ## Highlights
-- Two-line `[:parse ...]` injection pattern (RouterOS 7.20.x compatible)
+- Two-line `[:parse ...]` injection pattern
 - Flat YAML input (multiline blocks supported) → `$secret "key"` lookups
 - Supports keys with colons, spaces, and special characters
 - Fail-fast validation via `$secretRequire` and opt-in warning mode
-- Uses `:global` functions and variables (RouterOS 7.20.x requirement)
+- Uses `:global` functions and map (RouterOS requirement)
 
 ## Quick start
 ```rsc
 # optional: :local secretHandlingMode "warn"
 [:parse [/file get "secrets.rsc" contents]]
 [:parse $OUT]
-[$secretRequire {"wifi_password";"api_key"}]
 /user add name="ops" group=full password=[$secret "wifi_password"]
 ```
 
@@ -33,4 +32,4 @@ api_key: "some long key with spaces"
 - [Roadmap](roadmap.md) – upcoming features and ideas
 
 ## What to read next
-Start with the [Usage guide](usage.md) to see the helper surface and best practices, then review [Testing & CI](ci.md) for details on regression coverage (quoted keys, spaces, cleanup, multiline blocks, and more). When you are ready to automate, `.github/workflows/chr-smoke.yml` shows how the nightly QEMU job exercises the same flow end-to-end.
+Start with the [Usage guide](usage.md) to see the helper surface and best practices, then review [Testing & CI](ci.md) for details on regression coverage (quoted keys, spaces, multiline blocks, and more). When you are ready to automate, `.github/workflows/chr-smoke.yml` shows how the CHR smoke job exercises the same flow end-to-end against real firmware.

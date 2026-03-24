@@ -1,25 +1,23 @@
-# Example usage of Secjector (v0.1.3 - RouterOS 7.20.x compatible)
+# Example usage of Secjector
 
-# Optional: switch to warnings
+# Optional: switch to warnings instead of errors on missing keys
 # :local secretHandlingMode "warn"
 
-# Two-line injection (RouterOS 7.20.x pattern)
+# Two-line injection (the two :parse calls cannot be nested)
 [:parse [/file get "secrets.rsc" contents]]
 [:parse $OUT]
 
-# Validate and use (note: camelCase function names)
+# Validate required keys up-front
 [$secretRequire {"wifi_password";"api_key"}]
 
-# Use secrets directly in commands
+# Use secrets directly in commands (preferred)
 /user add name="ops" group=full password=[$secret "wifi_password"]
 
-# Or store in :global variable (NOT :local - RouterOS 7.20.x limitation)
-:global myApiKey [$secret "api_key"]
-:put ("API key length: " . [:len $myApiKey])
+# Or store in a variable
+:local apiKey [$secret "api_key"]
+:put ("API key length: " . [:len $apiKey])
 
-# Check if secret exists
+# Check if an optional secret exists
 :if ([$secretHas "optional_secret"]) do={
   :put "Optional secret is present"
 }
-
-# Note: secretCleanup not available in v0.1.3 (RouterOS 7.20.x limitation)

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Secjector** is a MikroTik RouterOS secrets injector. It generates RouterOS code from a flat `secrets.yaml` file. The main deliverable is a single RouterOS script (`secrets.rsc`) that parses YAML and exposes `$secret`, `$secretHas`, and `$secretRequire` accessor functions.
 
-Target platform: RouterOS 7.20.x (tested on 7.20.2).
+Target platform: RouterOS 7.20+. CI-tested against CHR 7.22 (`mikrotik/chr:stable`) on every push.
 
 ## Commands
 
@@ -31,7 +31,7 @@ export ROUTER_IDENT=~/.ssh/id_ed25519
 make test-integration
 ```
 
-Expected integration output: `TEST_OK:12:19:5:6:7:T:F:OK:F`
+Expected integration output: `TEST_OK:12:19:5:6:7:T:F:SKIP:N/A`
 
 ## Architecture
 
@@ -43,18 +43,18 @@ secrets.yaml (flat YAML)
     → User scripts call $secret "key", $secretHas "key", etc.
 ```
 
-### Injection Pattern (RouterOS 7.20.x)
+### Injection Pattern
 ```routeros
 [:parse [/file get "secrets.rsc" contents]]
 [:parse $OUT]
 ```
-Two separate `:parse` calls are required — they cannot be nested. The first parse evaluates `secrets.rsc` and stores generated code in `$OUT`; the second parse executes that code. `/import` cannot be used because it creates an isolated scope where globals don't persist.
+Two separate `:parse` calls are required — they cannot be nested (tested on 7.20 and 7.22). The first parse evaluates `secrets.rsc` and stores generated code in `$OUT`; the second parse executes that code. `/import` cannot be used because it creates an isolated scope where globals don't persist.
 
-### RouterOS 7.20.x Constraints
+### RouterOS Constraints
 These constraints drove key design decisions in `secrets.rsc`:
-- All functions and the secret map **must be `:global`** — RouterOS 7.20.x cannot assign arrays or functions to `:local`
+- All functions and the secret map **must be `:global`** — RouterOS cannot assign arrays or functions to `:local`
 - Function names use camelCase (`$secretHas`, `$secretRequire`) — underscores in `:local` names are rejected
-- `$secretCleanup` is disabled — RouterOS 7.20.x cannot `:set` a `:global` function to undefine it
+- `$secretCleanup` is disabled — RouterOS cannot `:set` a `:global` function to undefine it
 
 ### `secrets.rsc` Structure (the core file)
 | Lines | Purpose |
@@ -83,12 +83,12 @@ Set this before the injection lines.
 
 `tests/unit/test_regressions.py` — grep-based guards ensuring critical code patterns remain in `secrets.rsc` (e.g., `$helperUnquote` used for key unquoting, `---` YAML marker handled, cleanup comment present).
 
-`tests/integration/example_main.rsc` — runs on actual RouterOS and outputs a structured result string that CI checks against the expected value.
+`tests/integration/example_main.rsc` — example script used by the manual `make test-integration` target.
 
-`tests/integration/ci_runner.rsc` — wraps the integration test to capture output for CI parsing.
+`tests/integration/ci_runner.rsc` — self-contained integration script used by CI. Loads secrets directly, writes result to `ci-result.txt` (read via a second SSH call, since `/import` suppresses `:put` over SSH).
 
 ## CI
 
 `.github/workflows/ci.yml` — runs on every push/PR: `make lint && make test && mkdocs build --strict`.
 
-`.github/workflows/chr-smoke.yml` — manual trigger (`workflow_dispatch`). Downloads RouterOS CHR 7.20.2, boots under QEMU (tcg mode, no KVM), configures via serial/expect, runs the integration test, verifies output.
+`.github/workflows/chr-smoke.yml` — runs on every push/PR to `main` (also `workflow_dispatch`). Boots `mikrotik/chr:stable` (7.22) via Docker with KVM passthrough, configures via serial/expect, pushes test files over SSH, runs `ci_runner.rsc`, verifies exact output `TEST_OK:12:19:5:6:7:T:F:SKIP:N/A`.
